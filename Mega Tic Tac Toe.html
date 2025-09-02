@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mega Tic Tac Toe</title>
+  <!-- Orbitron font from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Orbitron', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #000064;
+      margin: 20px;
+      color: #fff;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+    }
+    p {
+      font-size: 1rem;
+      max-width: 500px;
+      text-align: center;
+      color: #b3b3ff;
+      margin-bottom: 15px;
+    }
+    #game-container {
+      display: grid;
+      grid-template-columns: repeat(3, 216px);
+      width: 648px;
+      height: 648px;
+      gap: 8px;
+      background-color: transparent;
+      padding: 8px;
+      border-radius: 4px;
+      box-sizing: content-box;
+      margin-bottom: 30px;
+    }
+    .medium-board {
+      display: grid;
+      grid-template-columns: repeat(3, 70px);
+      width: 210px;
+      height: 210px;
+      gap: 2px;
+      background-color: transparent;
+      padding: 4px;
+      border-radius: 3px;
+      position: relative;
+      box-sizing: content-box;
+    }
+    .small-board {
+      display: grid;
+      grid-template-columns: repeat(3, 23px);
+      width: 69px;
+      height: 69px;
+      gap: 0px;
+      background-color: #1a1a4d;
+      border: 1px solid #3b3b8a;
+      border-radius: 2px;
+      position: relative;
+      box-sizing: content-box;
+    }
+    .cell {
+      width: 23px;
+      height: 23px;
+      background-color: transparent;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid #ffffff;
+      border-radius: 2px;
+      box-sizing: border-box;
+      color: #fff;
+    }
+    .cell.x { color: #ff0000; }
+    .cell.o { color: #0000ff; }
+    .cell.x:hover { background-color: #ff0000; }
+    .cell.o:hover { background-color: #0000ff; }
+    .small-board.won.x { background-color: #ff0000 !important; }
+    .small-board.won.o { background-color: #0000ff !important; }
+    .medium-board.won.x { background-color: #ff0000 !important; }
+    .medium-board.won.o { background-color: #0000ff !important; }
+    .highlight { border: 2px solid #00ff00 !important; }
+    #status {
+      margin: 15px 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #ffffff;
+      background-color: #23238a;
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: 1px solid #ffffff;
+      letter-spacing: 1px;
+    }
+    button {
+      padding: 8px 20px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      background-color: #3b3b8a;
+      border: 1px solid #ffffff;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Orbitron', Arial, sans-serif;
+      letter-spacing: 1px;
+      margin: 4px 2px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background-color: #23238a;
+      color: #60a5fa;
+      border-color: #60a5fa;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mega Tic-Tac-Toe</h1>
+  <p>A Game of Strategy.</p>
+  <div id="game-container"></div>
+  <div id="status">Current Player: X | Next move: Anywhere</div>
+  <button id="reset">Reset Game</button>
+  <button id="quit">Quit Game</button>
+  <button id="undo">Undo Move</button>
+
+  <script>
+    const gameContainer = document.getElementById('game-container');
+    const status = document.getElementById('status');
+    const resetButton = document.getElementById('reset');
+    const quitButton = document.getElementById('quit');
+    const undoButton = document.getElementById('undo');
+
+    let currentPlayer = "X";
+    let nextMedium = -1;
+    let nextSmall = -1;
+    let bigBoard = Array(9).fill().map(() => ({
+      mediumBoards: Array(9).fill().map(() => ({
+        cells: Array(9).fill(''),
+        winner: null
+      })),
+      winner: null
+    }));
+
+    let gameStarted = true;
+    let moveHistory = [];
+
+    function isBoardFull(cells) {
+      return cells.every(cell => cell);
+    }
+
+    function updateStatus() {
+      let nextMoveText = "Anywhere";
+      if (nextMedium !== -1 && nextSmall === -1) {
+        nextMoveText = `Medium board ${nextMedium + 1}`;
+      } else if (nextMedium !== -1 && nextSmall !== -1) {
+        nextMoveText = `Medium board ${nextMedium + 1}, Small board ${nextSmall + 1}`;
+      }
+      status.textContent = `Current Player: ${currentPlayer} | Next move: ${nextMoveText}`;
+    }
+
+    function createBoard() {
+      gameContainer.innerHTML = '';
+      bigBoard.forEach((medium, mediumIndex) => {
+        const mediumBoardDiv = document.createElement('div');
+        mediumBoardDiv.className = 'medium-board';
+        if (medium.winner === "X" || medium.winner === "O") {
+          mediumBoardDiv.classList.add('won', medium.winner.toLowerCase());
+        }
+        if (nextMedium === -1 || nextMedium === mediumIndex) {
+          if (nextMedium !== -1) mediumBoardDiv.classList.add('highlight');
+        }
+        medium.mediumBoards.forEach((small, smallIndex) => {
+          const smallBoardDiv = document.createElement('div');
+          smallBoardDiv.className = 'small-board';
+          if (small.winner === "X" || small.winner === "O") {
+            smallBoardDiv.classList.add('won', small.winner.toLowerCase());
+          }
+          if ((nextMedium === -1 || mediumIndex === nextMedium) &&
+              (nextSmall === -1 || smallIndex === nextSmall)) {
+            if (nextSmall !== -1 && nextMedium === mediumIndex) smallBoardDiv.classList.add('highlight');
+          }
+          small.cells.forEach((cell, cellIndex) => {
+            const cellDiv = document.createElement('div');
+            cellDiv.className = `cell ${cell.toLowerCase()}`;
+            cellDiv.textContent = cell;
+            const isAllowed = !cell && !small.winner && !medium.winner &&
+              (nextMedium === -1 || mediumIndex === nextMedium) &&
+              (nextSmall === -1 || smallIndex === nextSmall);
+            if (isAllowed && gameStarted) {
+              cellDiv.addEventListener('click', () => makeMove(mediumIndex, smallIndex, cellIndex));
+            }
+            smallBoardDiv.appendChild(cellDiv);
+          });
+          mediumBoardDiv.appendChild(smallBoardDiv);
+        });
+        gameContainer.appendChild(mediumBoardDiv);
+      });
+      updateStatus();
+    }
+
+    function cloneBoard(board) {
+      return board.map(medium => ({
+        winner: medium.winner,
+        mediumBoards: medium.mediumBoards.map(small => ({
+          winner: small.winner,
+          cells: [...small.cells]
+        }))
+      }));
+    }
+
+    function makeMove(mediumIndex, smallIndex, cellIndex) {
+      moveHistory.push({ bigBoard: cloneBoard(bigBoard), currentPlayer, nextMedium, nextSmall });
+      const smallBoard = bigBoard[mediumIndex].mediumBoards[smallIndex];
+      if (smallBoard.cells[cellIndex] || smallBoard.winner || bigBoard[mediumIndex].winner) return;
+      smallBoard.cells[cellIndex] = currentPlayer;
+      checkSmallBoardWinner(mediumIndex, smallIndex);
+      if (smallBoard.winner) checkMediumBoardWinner(mediumIndex);
+      let tentativeNextMedium = smallIndex;
+      let tentativeNextSmall = cellIndex;
+      if (bigBoard[tentativeNextMedium].winner !== null) {
+        nextMedium = -1; nextSmall = -1;
+      } else {
+        nextMedium = tentativeNextMedium;
+        const targetSmall = bigBoard[nextMedium].mediumBoards[tentativeNextSmall];
+        nextSmall = targetSmall.winner !== null || isBoardFull(targetSmall.cells) ? -1 : tentativeNextSmall;
+      }
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      createBoard();
+      checkBigBoardWinner();
+    }
+
+    function checkSmallBoardWinner(mediumIndex, smallIndex) {
+      const cells = bigBoard[mediumIndex].mediumBoards[smallIndex].cells;
+      const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      for (const [a,b,c] of winPatterns) {
+        if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
+          bigBoard[mediumIndex].mediumBoards[smallIndex].winner = cells[a];
+          return;
+        }
+      }
+      if (isBoardFull(cells)) bigBoard[mediumIndex].mediumBoards[smallIndex].winner = 'Draw';
+    }
+
+    function checkMediumBoardWinner(mediumIndex) {
+      const mediumWinners = bigBoard[mediumIndex].mediumBoards.map(b => b.winner);
+      const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      for (const [a,b,c] of winPatterns) {
+        if (mediumWinners[a] && mediumWinners[a] === mediumWinners[b] && mediumWinners[a] === mediumWinners[c] && mediumWinners[a] !== 'Draw') {
+          bigBoard[mediumIndex].winner = mediumWinners[a];
+          return;
+        }
+      }
+      if (mediumWinners.every(w => w !== null)) bigBoard[mediumIndex].winner = 'Draw';
+    }
+
+    function checkBigBoardWinner() {
+      const mainWinners = bigBoard.map(b => b.winner);
+      const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      for (const [a,b,c] of winPatterns) {
+        if (mainWinners[a] && mainWinners[a] === mainWinners[b] && mainWinners[a] === mainWinners[c] && mainWinners[a] !== 'Draw') {
+          status.textContent = `Player ${mainWinners[a]} wins the game!`;
+          gameContainer.style.pointerEvents = 'none';
+          return;
+        }
+      }
+      if (mainWinners.every(w => w !== null)) {
+        status.textContent = "Game is a draw!";
+        gameContainer.style.pointerEvents = 'none';
+      }
+    }
+
+    resetButton.addEventListener('click', () => {
+      bigBoard = Array(9).fill().map(() => ({
+        mediumBoards: Array(9).fill().map(() => ({
+          cells: Array(9).fill(''),
+          winner: null
+        })),
+        winner: null
+      }));
+      currentPlayer = "X";
+      nextMedium = -1;
+      nextSmall = -1;
+      gameStarted = true;
+      moveHistory = [];
+      gameContainer.style.pointerEvents = 'auto';
+      createBoard();
+    });
+
+    undoButton.addEventListener('click', function() {
+      if (!gameStarted || moveHistory.length === 0) return;
+      const lastState = moveHistory.pop();
+      bigBoard = cloneBoard(lastState.bigBoard);
+      currentPlayer = lastState.currentPlayer;
+      nextMedium = lastState.nextMedium;
+      nextSmall = lastState.nextSmall;
+      gameContainer.style.pointerEvents = 'auto';
+      createBoard();
+    });
+
+    quitButton.addEventListener('click', function() {
+      gameStarted = false;
+      moveHistory = [];
+      gameContainer.style.display = 'none';
+      status.textContent = "Game quit. Reset to play again.";
+    });
+
+    createBoard();
+  </script>
+</body>
+</html>
